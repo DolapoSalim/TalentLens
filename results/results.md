@@ -6,12 +6,12 @@ Mean over 12 roles and 3 data seeds (pool = 4000). 'gap' = recall of qualified e
 
 | config | recall | recall (clear headline) | recall (vague headline) | gap |
 |---|---|---|---|---|
-| blob (naive) | 0.757 Â± 0.004 | 0.776 | 0.729 | +0.046 Â± 0.018 |
-| fielded, balanced | 0.716 Â± 0.001 | 0.753 | 0.661 | +0.092 Â± 0.017 |
-| fielded, notice-style | 0.700 Â± 0.001 | 0.785 | 0.575 | +0.209 Â± 0.018 |
-| adaptive, notice-style | 0.707 Â± 0.006 | 0.700 | 0.719 | -0.019 Â± 0.020 |
-| fielded, headline 60% | 0.641 Â± 0.002 | 0.806 | 0.399 | +0.407 Â± 0.020 |
-| adaptive, headline 60% | 0.674 Â± 0.003 | 0.666 | 0.689 | -0.023 Â± 0.025 |
+| blob (naive) | 0.757 ± 0.004 | 0.776 | 0.729 | +0.046 ± 0.018 |
+| fielded, balanced | 0.716 ± 0.001 | 0.753 | 0.661 | +0.092 ± 0.017 |
+| fielded, notice-style | 0.700 ± 0.001 | 0.785 | 0.575 | +0.209 ± 0.018 |
+| adaptive, notice-style | 0.707 ± 0.006 | 0.700 | 0.719 | -0.019 ± 0.020 |
+| fielded, headline 60% | 0.641 ± 0.002 | 0.806 | 0.399 | +0.407 ± 0.020 |
+| adaptive, headline 60% | 0.674 ± 0.003 | 0.666 | 0.689 | -0.023 ± 0.025 |
 
 ### B. Stage-2 grader comparison
 
