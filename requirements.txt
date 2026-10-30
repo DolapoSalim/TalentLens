@@ -1,0 +1,8 @@
+numpy>=1.26
+scikit-learn>=1.4
+pandas>=2.0
+matplotlib>=3.8
+pytest>=8.0
+# optional
+streamlit>=1.50        # review dashboard (app.py)
+anthropic>=0.40        # LLM grader / query writer (talentlens/llm.py)
