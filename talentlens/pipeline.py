@@ -42,6 +42,21 @@ def rank_weight(pay: float, cfg: PipelineConfig) -> float:
     return float(np.clip(cfg.w_min + (cfg.w_max - cfg.w_min) * t, cfg.w_min, cfg.w_max))
 
 
+def decide(grades: list[CriterionGrade], role: Role, cfg: PipelineConfig) -> tuple[str, float, list[str]]:
+    """Return (outcome, match_score, hard_failed_ids)."""
+    match = float(np.mean([g.score for g in grades]))
+    hard_zero = [(g, c) for g, c in zip(grades, role.criteria) if c.hard and g.score == 0]
+    if hard_zero:
+        ids = [c.id for _, c in hard_zero]
+        confident = any(g.confidence >= cfg.rescue_conf for g, _ in hard_zero)
+        if confident or not cfg.rescue_enabled:
+            return "rejected_hard_filter", match, ids
+        # optimistic score: impute the uncertain zeros as 'partially met'
+        opt = float(np.mean([1 if (c.hard and g.score == 0) else g.score for g, c in zip(grades, role.criteria)]))
+        return ("rescue_review" if opt >= cfg.pass_threshold else "below_threshold"), opt, ids
+    return ("passed" if match >= cfg.pass_threshold else "below_threshold"), match, []
+
+
 @dataclass
 class RunResult:
     role: Role
@@ -76,17 +91,7 @@ class Pipeline:
     # ------------------------------------------------------------ stage 2 decision logic
     def decide(self, grades: list[CriterionGrade], role: Role) -> tuple[str, float, list[str]]:
         """Return (outcome, match_score, hard_failed_ids)."""
-        match = float(np.mean([g.score for g in grades]))
-        hard_zero = [(g, c) for g, c in zip(grades, role.criteria) if c.hard and g.score == 0]
-        if hard_zero:
-            ids = [c.id for _, c in hard_zero]
-            confident = any(g.confidence >= self.cfg.rescue_conf for g, _ in hard_zero)
-            if confident or not self.cfg.rescue_enabled:
-                return "rejected_hard_filter", match, ids
-            # optimistic score: impute the uncertain zeros as 'partially met'
-            opt = float(np.mean([1 if (c.hard and g.score == 0) else g.score for g, c in zip(grades, role.criteria)]))
-            return ("rescue_review" if opt >= self.cfg.pass_threshold else "below_threshold"), opt, ids
-        return ("passed" if match >= self.cfg.pass_threshold else "below_threshold"), match, []
+        return decide(grades, role, self.cfg)
 
     def grade_profile(self, p: Profile, role: Role) -> list[CriterionGrade]:
         return self.grader.grade(p.id, CandidateInfo.from_profile(p), role)

@@ -146,6 +146,10 @@ class FieldIndex:
         S, W = self._components(self.X, self.D, query)
         return (S * W).sum(1)
 
+    def field_scores(self, query: dict[str, str]) -> tuple[np.ndarray, np.ndarray]:
+        """Per-field similarities and weights for the whole pool (rows = profiles, columns = FIELDS)."""
+        return self._components(self.X, self.D, query)
+
     def score_variants(self, profiles: list[Profile], query: dict[str, str]) -> np.ndarray:
         """Score modified copies of profiles with the already-fitted index (for counterfactual audits)."""
         X, D = self._matrices([field_texts(p) for p in profiles], [blob_text(p) for p in profiles])

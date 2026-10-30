@@ -1,0 +1,28 @@
+CANDIDATE NAME
+Passionate problem solver | Lifelong learner
+Pisa, Italy | candidate@example.com | +39 000 000 0000
+
+SUMMARY
+Data professional with eight years of experience turning messy data into products that customers use every day.
+
+EXPERIENCE
+Senior Data Scientist | Helios Analytics | 2021 - Present
+- Lead a team of four building customer-facing forecasting and recommendation products for retail clients, owning the roadmap from discovery to production and reporting to the VP of Data; built text classification and NLP models with PyTorch for support-ticket routing.
+- Introduced offline evaluation and A/B testing standards adopted across three product lines.
+
+Data Scientist, Quartz Health
+2018 - 2021
+- Built churn prediction models in Python and SQL; deployed deep learning models for clinical text with PyTorch.
+
+Data Analyst at Orbit Commerce (2016 - 2018)
+- Weekly reporting and dashboards in SQL and Excel.
+
+EDUCATION
+MSc Statistics, University of Pisa (2016)
+BSc Mathematics, University of Pisa (2014)
+
+SKILLS
+Communication, Stakeholder Management, Leadership, Agile, Jira, Tableau, Excel, Power BI, Storytelling, Mentoring, Product Thinking, Presentation, Google Sheets, Git, Docker, Python, SQL, PyTorch, Statistics
+
+LANGUAGES
+Italian (native), English (fluent)

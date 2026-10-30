@@ -4,5 +4,7 @@ pandas>=2.0
 matplotlib>=3.8
 pytest>=8.0
 # optional
-streamlit>=1.50        # review dashboard (app.py)
+streamlit>=1.50        # review dashboard (app.py) and CV checker (cv_checker.py)
+pypdf>=4.0             # CV checker: PDF uploads
+python-docx>=1.1       # CV checker: .docx uploads
 anthropic>=0.40        # LLM grader / query writer (talentlens/llm.py)

@@ -86,6 +86,32 @@ Read this cautiously: ground truth here is defined by the same rubric the grader
 
 Full tables: `results/results.md`; figures: `results/fig_*.png`.
 
+## CV readiness check (candidate-facing)
+
+The same pipeline, pointed the other way: a candidate uploads a job description and their CV, and the checker runs that
+one CV through the reconstructed funnel against the synthetic pool, the way any pool member would be scored.
+
+```
+ JD (pdf/docx/txt) ──► parse_jd ──► Role: domain, target title, criteria (must-have vs nice-to-have), pay
+ CV (pdf/docx/txt) ──► parse_cv ──► Profile: headline, dated roles, degrees, skills (in order), languages, location
+                                        │  (both editable in the UI: the checker only sees what the parser read)
+ Stage 1   where the CV ranks in the 4,000-expert pool, shortlist cutoff, per-field similarity vs the shortlist
+ Stage 2   same grader, hard filters and 1.2 pass bar → per-criterion 0/1/2 with evidence
+ Rank      position among the pool's passers (reviewers see the top 20 first)
+ What-ifs  formatting-only changes (clear headline from your own title + skills, role skills first): no new claims
+       ──► readiness 0-100 + verdict (Ready · Competitive · Hidden · At risk · Not ready) + prioritised fixes
+```
+
+The advice comes from the reverse-engineered mechanics: only the first 15 skills and the first 200 characters of each of
+the 5 most recent roles are indexed; a skill scores 2 only when it is both listed and evidenced in work; a missing
+language level reads as "not met" on a hard filter; non-standard job titles count only 50% toward years of experience.
+On the bundled example, a vague headline keeps an otherwise passing CV off the shortlist ("Hidden", top 22% of the pool);
+rewriting the headline from the CV's own title and skills moves it to the top 5%.
+
+Readiness = 35% Stage 1 + 45% Stage 2 + 20% rank, capped at 25 for a confident must-have failure and 50 for a must-have
+that rests on missing evidence. The percentile says how a CV *reads* to this kind of system, not how it compares with real
+applicants. The parsers are rule-based and only know the taxonomy's seven domains; a JD outside them gets a warning.
+
 ## Mapping from the disclosure to code
 
 | Described behaviour | Where |
@@ -105,10 +131,12 @@ Full tables: `results/results.md`; figures: `results/fig_*.png`.
 
 ```bash
 pip install -r requirements.txt
-pytest -q                              # 13 tests
+pytest -q                              # 21 tests
 python scripts/demo.py                 # 20-second tour incl. contesting an expert
 python scripts/run_experiments.py      # all tables + figures (~5 min; --quick for ~1 min)
 streamlit run app.py                   # project-lead dashboard
+streamlit run cv_checker.py            # candidate CV readiness check (upload JD + CV)
+python scripts/check_cv.py --cv examples/sample_cv.txt --jd examples/sample_jd.txt   # same, from the terminal
 ```
 
 LLM grading (optional): `export ANTHROPIC_API_KEY=...`, then `Pipeline(P, LLMGrader(), ...)`. The model is set by
@@ -137,9 +165,11 @@ shadow audit; intersectional counterfactuals.
 ## Layout
 
 ```
-talentlens/  schema · taxonomy · synth · retrieval · grader · llm · pipeline · evaluate · audit · explain
-scripts/     run_experiments.py · demo.py
-tests/       test_talentlens.py
+talentlens/  schema · taxonomy · synth · retrieval · grader · llm · pipeline · evaluate · audit · explain · parse · cv_check
+scripts/     run_experiments.py · demo.py · check_cv.py
+tests/       test_talentlens.py · test_cv_check.py
+examples/    sample_cv.txt · sample_jd.txt (fictional)
 app.py       Streamlit review dashboard
+cv_checker.py  Streamlit CV readiness check
 results/     tables, figures, audit-log samples
 ```

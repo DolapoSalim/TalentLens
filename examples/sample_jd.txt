@@ -1,0 +1,21 @@
+Senior Machine Learning Engineer, LLM Evaluation
+
+We are looking for an experienced machine learning engineer to design evaluation harnesses for large language models used by enterprise clients across Europe.
+
+What you'll do:
+- Build automated evaluation pipelines for LLM outputs
+- Design experiments and statistical analyses to compare model versions
+- Work with research and product teams to define quality metrics
+
+Requirements:
+- 5+ years of experience in data science or machine learning
+- Strong Python and PyTorch skills
+- Hands-on NLP and deep learning experience
+- Master's degree in Computer Science, Statistics or a related field
+- Fluent English (C1)
+
+Nice to have:
+- Experience with Spark for large-scale data processing
+- AWS ML Specialty certification
+
+Contract, fully remote. Rate: $110-130/hour.
