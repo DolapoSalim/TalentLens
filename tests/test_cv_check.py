@@ -9,15 +9,10 @@ sys.path.insert(0, str(ROOT))
 from talentlens.schema import CURRENT_YEAR
 from talentlens.synth import generate_profiles, make_roles
 from talentlens.parse import parse_cv, parse_jd, read_document, make_criterion, criterion_value
-from talentlens.cv_check import CVChecker, CheckConfig, to_text
+from talentlens.cv_check import CVChecker, PoolSimulator, suggested_headline, to_text
 
 SAMPLE_CV = (ROOT / "examples" / "sample_cv.txt").read_text(encoding="utf-8")
 SAMPLE_JD = (ROOT / "examples" / "sample_jd.txt").read_text(encoding="utf-8")
-
-
-@pytest.fixture(scope="module")
-def checker():
-    return CVChecker(CheckConfig(), profiles=generate_profiles(1500, seed=3))
 
 
 def test_parse_jd_sample():
@@ -77,29 +72,45 @@ def test_read_document_text_with_bom():
     assert read_document("cv.txt", "﻿Hello".encode("utf-8")) == "Hello"
 
 
-def test_check_report_on_sample(checker):
-    rep = checker.check(parse_cv(SAMPLE_CV)[0], parse_jd(SAMPLE_JD)[0])
-    assert 0 <= rep["readiness"] <= 100 and rep["stage2"]["outcome"] == "passed"
-    head = next(w for w in rep["what_ifs"] if w["change"] == "clear headline")
-    assert head["delta"] > 0 and head["percentile"] > rep["stage1"]["percentile"]   # vague headline costs Stage-1 rank
-    assert rep["recommendations"] and "READINESS" in to_text(rep)
+def test_check_report_on_sample():
+    cv, role = parse_cv(SAMPLE_CV)[0], parse_jd(SAMPLE_JD)[0]
+    rep = CVChecker().check(cv, role)
+    checks = {c["check"]: c["score"] for c in rep["visibility"]["checks"]}
+    assert rep["requirements"]["outcome"] == "passed" and rep["verdict"] == "Hard to find"
+    assert checks["headline"] == 0 and checks["skills list order"] == 0 and checks["location"] is None   # no location rule
+    assert rep["recommendations"][0]["area"] == "Visibility" and "READINESS" in to_text(rep)
+
+    fixed = dataclasses.replace(cv, headline=suggested_headline(cv, role))       # own title + skills, nothing new claimed
+    after = CVChecker().check(fixed, role)
+    assert after["visibility"]["score"] > rep["visibility"]["score"] and after["readiness"] > rep["readiness"]
+    assert after["requirements"] == rep["requirements"]                          # Stage 2 never sees the headline
 
 
-def test_check_matches_pipeline_for_a_pool_member(checker):
-    role = make_roles()[0]
-    res = checker.pipe.run(role)
-    rec = next(r for r in res.ranked if r.retrieval_phase == "active")
-    p = checker.pipe.by_id[rec.profile_id]
-    rep = checker.check(p, role)
-    assert rep["stage1"]["shortlisted"] and rep["stage1"]["score"] == pytest.approx(rec.retrieval_score)
-    assert rep["stage2"]["match"] == pytest.approx(rec.match_score) and rep["stage2"]["outcome"] == "passed"
-
-
-def test_edited_role_is_regraded(checker):
+def test_edited_role_is_regraded():
     cv, _ = parse_cv(SAMPLE_CV)
     role, _ = parse_jd(SAMPLE_JD)
-    before = checker.check(cv, role)["stage2"]["outcome"]
+    checker = CVChecker()
+    before = checker.check(cv, role)["requirements"]["outcome"]
     harder = dataclasses.replace(role, criteria=role.criteria + [make_criterion("cert", "CKA", True)])   # same role.id
     after = checker.check(cv, harder)
-    assert before == "passed" and after["stage2"]["outcome"] != "passed"
-    assert after["recommendations"][0]["priority"] == "high"
+    assert before == "passed" and after["requirements"]["outcome"] != "passed"
+    assert after["readiness"] <= 50 and after["recommendations"][0]["priority"] == "high"
+
+
+@pytest.fixture(scope="module")
+def sim():
+    return PoolSimulator(profiles=generate_profiles(1500, seed=3))
+
+
+def test_simulation_matches_pipeline_for_a_pool_member(sim):
+    role = make_roles()[0]
+    res = sim.pipe.run(role)
+    rec = next(r for r in res.ranked if r.retrieval_phase == "active")
+    out = sim.simulate(sim.pipe.by_id[rec.profile_id], role)
+    assert out["shortlisted"] and out["score"] == pytest.approx(rec.retrieval_score) and out["rank"]
+
+
+def test_simulation_rewards_the_visibility_fixes(sim):
+    out = sim.simulate(parse_cv(SAMPLE_CV)[0], parse_jd(SAMPLE_JD)[0])
+    head = next(w for w in out["what_ifs"] if w["change"] == "clear headline")
+    assert head["percentile"] > out["percentile"]

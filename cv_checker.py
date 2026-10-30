@@ -12,23 +12,23 @@ from talentlens.schema import Experience, Education
 from talentlens.synth import make_roles
 from talentlens.taxonomy import DOMAINS, DEGREE_RANK, LEVEL_ORDER
 from talentlens.parse import parse_cv, parse_jd, read_document, make_criterion, criterion_value, KINDS
-from talentlens.cv_check import CVChecker, CheckConfig, READINESS_WEIGHTS, to_text
+from talentlens.cv_check import CVChecker, PoolSimulator, READINESS_WEIGHTS, VISIBILITY_WEIGHTS, STRONG_MATCH, to_text
 
 st.set_page_config(page_title="TalentLens CV check", layout="wide")
 st.title("TalentLens: CV readiness check")
-st.caption("Runs your CV through a reconstruction of a two-stage AI matching pipeline (retrieval, then rubric grading) "
-           "against a synthetic pool of 4,000 experts, and shows where it would be filtered out and what to change. "
-           "It is not any platform's real score. Your CV is processed in memory and is not stored or logged.")
-
-with st.sidebar:
-    mode = st.radio("Stage-1 retrieval to test against", ["fielded", "adaptive"],
-                    format_func={"fielded": "Platform as disclosed (headline-heavy)",
-                                 "adaptive": "TalentLens adaptive (headline counts less when vague)"}.get)
+st.caption("Grades your CV against a job description the way a reconstructed two-stage AI matching pipeline would "
+           "(retrieval, then rubric grading), and shows what to change. It is not any platform's real score. "
+           "Your CV is processed in memory and is not stored or logged.")
 
 
-@st.cache_resource(show_spinner="Building the benchmark pool (first run only, ~15 s)...")
-def checker(mode):
-    return CVChecker(CheckConfig(mode=mode))
+@st.cache_resource
+def checker():
+    return CVChecker()
+
+
+@st.cache_resource(show_spinner="Building the synthetic pool (first time only, ~15 s)...")
+def simulator(mode):
+    return PoolSimulator(mode=mode)
 
 
 def document(label, key):
@@ -146,54 +146,73 @@ if not role.criteria:
     st.stop()
 
 # ------------------------------------------------------------------ 3. results
-rep = checker(mode).check(profile, role)
-s1, s2, rk = rep["stage1"], rep["stage2"], rep["rank"]
+rep = checker().check(profile, role)
+req, vis = rep["requirements"], rep["visibility"]
 st.header(f"3. Result: {rep['verdict']}")
-m = st.columns(4)
+m = st.columns(3)
 m[0].metric("Readiness", f"{rep['readiness']}/100")
-m[1].metric("Stage 1: retrieval", f"top {100 * (1 - s1['percentile']):.0f}%",
-            "shortlisted" if s1["shortlisted"] else f"cutoff is top {100 * (1 - s1['cutoff_percentile']):.0f}%",
-            delta_color="normal" if s1["shortlisted"] else "inverse")
-m[2].metric("Stage 2: AI grading", f"{s2['match']:.2f} / 2", f"{s2['match'] - s2['threshold']:+.2f} vs pass bar {s2['threshold']}")
-m[3].metric("Final rank", f"#{rk['rank']} of {rk['passers']}" if rk else "not ranked",
-            ("if shortlisted" if rk["hypothetical"] else f"reviewers see top {rk['review_size']}") if rk else s2["outcome"].replace("_", " "),
-            delta_color="off")
+m[1].metric("Requirements (AI grading)", f"{req['match']:.2f} / 2", f"{req['match'] - req['threshold']:+.2f} vs pass bar {req['threshold']}")
+m[2].metric("Visibility (how retrieval reads it)", f"{vis['score']:.0%}")
 st.write(rep["verdict_detail"])
 
 st.subheader("What to change, most important first")
 if rep["recommendations"]:
     st.dataframe(pd.DataFrame(rep["recommendations"]), width="stretch", hide_index=True)
 else:
-    st.success("Nothing to change: every criterion is fully evidenced and the CV clears Stage 1.")
+    st.success("Nothing to change: every criterion is fully evidenced and the CV is presented the way retrieval reads it.")
 
-t1, t2, t3, t4 = st.tabs(["Stage 1 detail", "Stage 2 detail", "Presentation what-ifs", "How the score works"])
+t1, t2, t3, t4 = st.tabs(["Requirements", "Visibility checklist", "Simulate against a synthetic pool", "How the score works"])
 with t1:
-    st.caption("Similarity of each CV field to the role's 'ideal candidate' query, next to the median of the shortlisted pool. "
-               f"Headline consistency with the rest of your CV: {s1['headline_consistency']:.2f}.")
-    st.dataframe(pd.DataFrame(s1["fields"]).round(3), width="stretch", hide_index=True)
-with t2:
     st.caption("0 = not met, 1 = partly (listed OR used, not both), 2 = fully. Low confidence means the score rests on missing evidence.")
-    st.dataframe(pd.DataFrame(s2["grades"]), width="stretch", hide_index=True)
+    st.dataframe(pd.DataFrame(req["grades"]), width="stretch", hide_index=True)
+with t2:
+    st.caption("How the first, retrieval stage reads a CV. Checks marked n/a do not apply to this role.")
+    vc = pd.DataFrame(vis["checks"])
+    vc["score"] = vc.score.map(lambda s: "n/a" if pd.isna(s) else f"{s:.0%}")
+    vc["weight"] = vc.weight.map("{:.0%}".format)
+    st.dataframe(vc[["check", "weight", "score", "detail", "action"]], width="stretch", hide_index=True)
 with t3:
-    st.caption("Formatting-only changes that reuse your own title and skills. Nothing new is claimed.")
-    if rep["what_ifs"]:
-        wi = pd.DataFrame(rep["what_ifs"])
-        wi["position"] = wi.percentile.map(lambda p: f"top {100 * (1 - p):.0f}%")
-        st.dataframe(wi[["change", "detail", "position", "shortlisted", "delta"]].round(4), width="stretch", hide_index=True)
-    else:
-        st.write("No formatting changes to try: your headline and skills order already match the role.")
+    st.caption("Optional. Ranks your CV against 4,000 synthetic experts, the way the retrieval stage shortlists the top ~10%. "
+               "The competitors are synthetic, so this shows what the visibility fixes are worth, not how you compare "
+               "with real applicants. It does not change your readiness score.")
+    mode = st.radio("Retrieval", ["fielded", "adaptive"], horizontal=True,
+                    format_func={"fielded": "Platform as disclosed (headline-heavy)",
+                                 "adaptive": "TalentLens adaptive (vague headlines count less)"}.get)
+    if st.toggle("Run the simulation"):
+        sim = simulator(mode).simulate(profile, role)
+        rep["simulation"] = sim
+        rk = sim["rank"]
+        a, b, c = st.columns(3)
+        a.metric("Retrieval position", f"top {100 * (1 - sim['percentile']):.0f}%",
+                 "shortlisted" if sim["shortlisted"] else f"cutoff is top {100 * (1 - sim['cutoff_percentile']):.0f}%",
+                 delta_color="normal" if sim["shortlisted"] else "inverse")
+        b.metric("Rank among passers", f"#{rk['rank']} of {rk['passers']}" if rk else "not ranked",
+                 ("if shortlisted" if rk["hypothetical"] else f"reviewers see top {rk['review_size']}") if rk else "does not pass grading",
+                 delta_color="off")
+        c.metric("Pool / shortlist", f"{sim['pool']:,} / {sim['shortlist_size']}")
+        if sim["what_ifs"]:
+            st.markdown("**Formatting-only what-ifs** (your own title and skills, nothing new claimed)")
+            wi = pd.DataFrame(sim["what_ifs"])
+            wi["position"] = wi.percentile.map(lambda p: f"top {100 * (1 - p):.0f}%")
+            st.dataframe(wi[["change", "detail", "position", "shortlisted"]], width="stretch", hide_index=True)
+        st.markdown("**Per-field similarity** to the role's 'ideal candidate' query, next to the shortlisted median")
+        st.dataframe(pd.DataFrame(sim["fields"]).round(3), width="stretch", hide_index=True)
 with t4:
     w = READINESS_WEIGHTS
+    vw = ", ".join(f"{k} {v:.0%}" for k, v in VISIBILITY_WEIGHTS.items())
     st.markdown(f"""
-Readiness = {w['stage1']:.0%} Stage 1 + {w['stage2']:.0%} Stage 2 + {w['rank']:.0%} rank, then capped by the outcome.
+Readiness = {w['requirements']:.0%} requirements + {w['visibility']:.0%} visibility, then capped by the outcome.
 
-- **Stage 1** is 1 when you clear the shortlist cutoff, otherwise your pool percentile divided by the cutoff percentile (at most 0.95).
-- **Stage 2** is your average criterion score divided by 2.
-- **Rank** is 1 inside the top {rk['review_size'] if rk else 20} passers reviewers see first, otherwise 20 / your rank (0 if not shortlisted).
-- A confident must-have failure caps readiness at 25; a must-have that rests on missing evidence caps it at 50.
+- **Requirements** is your average criterion grade divided by 2, using the same grader, must-have filters and pass bar
+  ({req['threshold']}) as the pipeline. A confident must-have failure caps readiness at 25; a must-have that rests
+  on missing evidence caps it at 50.
+- **Visibility** is a weighted checklist of what the retrieval stage reads: {vw}. The weights follow the
+  disclosed field order (headline first). Checks that do not apply to the role are left out.
+- Verdicts: *Ready* (requirements at least {STRONG_MATCH}/2 and visibility at least 80%), *Nearly ready* (passes but
+  short of one of those), *Hard to find* (passes, visibility under 60%), *At risk* (a must-have is not visible),
+  *Not ready* (fails a must-have or the pass bar).
 
-The pool is synthetic, so the percentile tells you how your CV *reads* to this kind of system, not how you compare
-with real applicants. Retrieval mode: **{rep['benchmark']['mode']}**; pool {rep['benchmark']['pool']:,}; shortlist {rep['benchmark']['shortlist']}.
+Nothing here compares you with other people. Use the simulation tab to see that comparison against a synthetic pool.
 """)
 
 st.download_button("Download report (.txt)", to_text(rep), file_name="cv_readiness_report.txt")
