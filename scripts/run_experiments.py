@@ -192,15 +192,16 @@ def exp_main(n: int):
         s = shadow_audit(pipe, r, res, per_bucket=40, truth_role=truth[r.id], validate=True)
         rows.append(dict(role=r.id, found=s["found_pass"], est_missed=round(s["est_missed"]), ci=f"[{s['est_missed_lo']:.0f}, {s['est_missed_hi']:.0f}]",
                          exact_missed=s["exact_grader_missed"], truth_missed=s["truth_missed"],
-                         est_recall=s["est_stage1_recall"], recommended_extra_k=s["recommended_extra_k"] if s["recommended_extra_k"] else "all"))
+                         est_recall=s["est_stage1_recall"], recommended_extra_k=s["recommended_extra_k"] if s["recommended_extra_k"] is not None else "all"))
         rows[-1]["_in_ci"] = s["est_missed_lo"] <= s["exact_grader_missed"] <= s["est_missed_hi"]
         rows[-1]["_lo"], rows[-1]["_hi"] = s["est_missed_lo"], s["est_missed_hi"]
     dfF = pd.DataFrame(rows)
+    rc = kcfg(n)
     cover = dfF["_in_ci"].mean()
     err = (dfF.est_missed - dfF.exact_missed).abs().mean()
     emit("F. Shadow audit of the non-shortlisted pool (40 graded per stratum, 160 per role)", dfF.drop(columns=["_in_ci", "_lo", "_hi"]),
          f"Audit estimate vs. exhaustive grading of everyone outside the shortlist. CI coverage of the exact value: {cover:.0%} "
-         f"over {len(dfF)} roles; mean absolute error {err:.1f} experts (grading 160 profiles instead of ~{n - 400}).", "F_shadow", fmt="{:.2f}")
+         f"over {len(dfF)} roles; mean absolute error {err:.1f} experts (grading 160 profiles instead of ~{n - rc.k_active - rc.k_broad}).", "F_shadow", fmt="{:.2f}")
     plt.figure(figsize=(4.5, 4.5))
     plt.errorbar(dfF.exact_missed, dfF.est_missed, yerr=[dfF.est_missed - dfF._lo, dfF._hi - dfF.est_missed], fmt="o", capsize=3)
     m = max(dfF.exact_missed.max(), dfF._hi.max()) * 1.05
@@ -215,5 +216,5 @@ if __name__ == "__main__":
     n = 1500 if a.quick else 4000
     exp_retrieval(n, seeds=(7,) if a.quick else (7, 11, 23))
     exp_main(n)
-    (OUT / "results.md").write_text("# Experiment results\n\n" + "\n".join(md_parts))
+    (OUT / "results.md").write_text("# Experiment results\n\n" + "\n".join(md_parts), encoding="utf-8")
     print(f"\nWrote {OUT}/results.md and figures")

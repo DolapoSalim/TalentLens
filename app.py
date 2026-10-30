@@ -42,9 +42,17 @@ def build(n, mode, rescue, budget, grader_name):
     return P, Pipeline(P, grader, cfg, log_path=log), build_truth(P, roles)
 
 
+@st.cache_resource(show_spinner="Running pipeline...")
+def run_role(n, mode, rescue, budget, grader_name, role_id):
+    """Run once per (config, role): every widget click reruns this script, and an uncached
+    pipe.run() would append the whole shortlist to the audit log again each time."""
+    _, pipe, _ = build(n, mode, rescue, budget, grader_name)
+    return pipe.run(next(r for r in roles if r.id == role_id))
+
+
 P, pipe, truth = build(n, mode, rescue, budget, grader_name)
 by = {p.id: p for p in P}
-res = pipe.run(role)
+res = run_role(n, mode, rescue, budget, grader_name, role.id)
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Pool", len(P)); c2.metric("Shortlisted (Stage 1)", len(res.records))
